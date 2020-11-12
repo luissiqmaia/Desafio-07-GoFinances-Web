@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 
+// import { findByLabelText } from '@testing-library/react';
 import income from '../../assets/income.svg';
 import outcome from '../../assets/outcome.svg';
 import total from '../../assets/total.svg';
+
+import house from '../../assets/house.svg';
+import sell from '../../assets/sell.svg';
+import food from '../../assets/food.svg';
 
 import api from '../../services/api';
 
 import Header from '../../components/Header';
 
 import formatValue from '../../utils/formatValue';
+import formatDate from '../../utils/formatDate';
 
 import { Container, CardContainer, Card, TableContainer } from './styles';
 
@@ -29,13 +35,56 @@ interface Balance {
   total: string;
 }
 
-const Dashboard: React.FC = () => {
-  // const [transactions, setTransactions] = useState<Transaction[]>([]);
-  // const [balance, setBalance] = useState<Balance>({} as Balance);
+interface TransactionsBalance {
+  transactions: Transaction[];
+  balance: Balance;
+}
 
+const Dashboard: React.FC = () => {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [balance, setBalance] = useState<Balance>({} as Balance);
+
+  const showIcon = React.useCallback((category: string): ReactNode => {
+    if (category.toLowerCase() === 'casa' || category.toLowerCase() === 'house')
+      return <img src={house} alt="House" />;
+
+    if (
+      category.toLowerCase() === 'alimentação' ||
+      category.toLowerCase() === 'food'
+    )
+      return <img src={food} alt="Food" />;
+
+    return <img src={sell} alt="Sell" />;
+  }, []);
   useEffect(() => {
     async function loadTransactions(): Promise<void> {
-      // TODO
+      try {
+        const response = await api.get<TransactionsBalance>('/transactions');
+        const {
+          transactions: transactionsData,
+          balance: balanceData,
+        } = response.data;
+
+        const transactionsFormatted = transactionsData.map(t => ({
+          ...t,
+          formattedValue:
+            t.type === 'outcome'
+              ? ` - ${formatValue(t.value)}`
+              : formatValue(t.value),
+          formattedDate: formatDate(t.created_at),
+        }));
+
+        const ballanceFormatted = {
+          income: formatValue(parseFloat(balanceData.income)),
+          outcome: formatValue(parseFloat(balanceData.outcome)),
+          total: formatValue(parseFloat(balanceData.total)),
+        };
+
+        setTransactions(transactionsFormatted);
+        setBalance(ballanceFormatted);
+      } catch (err) {
+        console.log(err);
+      }
     }
 
     loadTransactions();
@@ -51,21 +100,29 @@ const Dashboard: React.FC = () => {
               <p>Entradas</p>
               <img src={income} alt="Income" />
             </header>
-            <h1 data-testid="balance-income">R$ 5.000,00</h1>
+            {balance.income && (
+              <h1 data-testid="balance-income">{balance.income}</h1>
+            )}
           </Card>
+
           <Card>
             <header>
               <p>Saídas</p>
               <img src={outcome} alt="Outcome" />
             </header>
-            <h1 data-testid="balance-outcome">R$ 1.000,00</h1>
+            {balance.outcome && (
+              <h1 data-testid="balance-outcome">{balance.outcome}</h1>
+            )}
           </Card>
+
           <Card total>
             <header>
               <p>Total</p>
               <img src={total} alt="Total" />
             </header>
-            <h1 data-testid="balance-total">R$ 4000,00</h1>
+            {balance.total && (
+              <h1 data-testid="balance-total">{balance.total}</h1>
+            )}
           </Card>
         </CardContainer>
 
@@ -81,7 +138,20 @@ const Dashboard: React.FC = () => {
             </thead>
 
             <tbody>
-              <tr>
+              {transactions &&
+                transactions.map(t => (
+                  <tr key={t.id}>
+                    <td className="title">{t.title}</td>
+                    <td className={t.type}>{t.formattedValue}</td>
+                    <td className="icon-category">
+                      {showIcon(t.category.title)}
+                      {t.category.title}
+                    </td>
+                    <td>{t.formattedDate}</td>
+                  </tr>
+                ))}
+
+              {/* <tr>
                 <td className="title">Computer</td>
                 <td className="income">R$ 5.000,00</td>
                 <td>Sell</td>
@@ -92,7 +162,7 @@ const Dashboard: React.FC = () => {
                 <td className="outcome">- R$ 1.000,00</td>
                 <td>Hosting</td>
                 <td>19/04/2020</td>
-              </tr>
+              </tr> */}
             </tbody>
           </table>
         </TableContainer>
